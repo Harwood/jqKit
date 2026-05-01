@@ -1,0 +1,16 @@
+# XCFrameworks — built locally by scripts/build-xcframeworks.sh
+# Committed binaries are tracked via GitHub release assets + checksums in Package.swift
+Frameworks/
+
+# Build intermediates
+.build-xcfw/
+.build/
+.swiftpm/
+
+# Zipped release artifacts (produced locally before upload)
+*.xcframework.zip
+
+# Xcode
+*.xcuserstate
+xcuserdata/
+DerivedData/

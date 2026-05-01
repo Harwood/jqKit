@@ -1,0 +1,118 @@
+name: Build XCFrameworks
+
+on:
+  push:
+    tags:
+      # Trigger on tags like: jq-1.8.1  jq-1.9.0  etc.
+      - 'jq-*'
+  workflow_dispatch:
+    inputs:
+      jq_version:
+        description: 'jq version to build (e.g. 1.8.1)'
+        required: true
+        default: '1.8.1'
+      oniguruma_version:
+        description: 'oniguruma version to build (e.g. 6.9.9)'
+        required: true
+        default: '6.9.9'
+
+jobs:
+  build:
+    name: Build XCFrameworks
+    runs-on: macos-15   # Xcode 16 — required for visionOS SDK
+    permissions:
+      contents: write   # needed to create a GitHub release
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Install build tools
+        run: brew install automake autoconf libtool
+
+      - name: Resolve versions
+        id: versions
+        run: |
+          if [[ "${GITHUB_EVENT_NAME}" == "push" ]]; then
+            # Extract version from tag: jq-1.8.1 → 1.8.1
+            JQ_VERSION="${GITHUB_REF_NAME#jq-}"
+          else
+            JQ_VERSION="${{ github.event.inputs.jq_version }}"
+          fi
+          echo "jq_version=${JQ_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "onig_version=${{ github.event.inputs.oniguruma_version || '6.9.9' }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build XCFrameworks
+        run: |
+          chmod +x scripts/build-xcframeworks.sh
+          ./scripts/build-xcframeworks.sh \
+            "${{ steps.versions.outputs.jq_version }}" \
+            "${{ steps.versions.outputs.onig_version }}"
+
+      - name: Zip XCFrameworks
+        run: |
+          cd Frameworks
+          zip -r ../Cjq.xcframework.zip Cjq.xcframework
+          zip -r ../Coniguruma.xcframework.zip Coniguruma.xcframework
+
+      - name: Compute checksums
+        id: checksums
+        run: |
+          CJQ_CHECKSUM=$(shasum -a 256 Cjq.xcframework.zip | awk '{print $1}')
+          ONIG_CHECKSUM=$(shasum -a 256 Coniguruma.xcframework.zip | awk '{print $1}')
+          echo "cjq_checksum=${CJQ_CHECKSUM}"   >> "$GITHUB_OUTPUT"
+          echo "onig_checksum=${ONIG_CHECKSUM}" >> "$GITHUB_OUTPUT"
+          echo "Cjq.xcframework.zip SHA-256:      ${CJQ_CHECKSUM}"
+          echo "Coniguruma.xcframework.zip SHA-256: ${ONIG_CHECKSUM}"
+
+      - name: Generate Package.swift snippet
+        run: |
+          TAG="${GITHUB_REF_NAME:-jq-${{ steps.versions.outputs.jq_version }}}"
+          cat <<EOF
+          ─────────────────────────────────────────────────────────────────────────────
+          Update Package.swift with the following URL binary targets:
+
+            .binaryTarget(
+                name: "Cjq",
+                url: "https://github.com/Harwood/jqKit/releases/download/${TAG}/Cjq.xcframework.zip",
+                checksum: "${{ steps.checksums.outputs.cjq_checksum }}"),
+            .binaryTarget(
+                name: "Coniguruma",
+                url: "https://github.com/Harwood/jqKit/releases/download/${TAG}/Coniguruma.xcframework.zip",
+                checksum: "${{ steps.checksums.outputs.onig_checksum }}"),
+          ─────────────────────────────────────────────────────────────────────────────
+          EOF
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: jq ${{ steps.versions.outputs.jq_version }}
+          body: |
+            ## jqKit — jq ${{ steps.versions.outputs.jq_version }}
+
+            XCFrameworks built from [jq ${{ steps.versions.outputs.jq_version }}](https://github.com/jqlang/jq/releases/tag/jq-${{ steps.versions.outputs.jq_version }}) source.
+
+            ### Package.swift — URL binary targets
+
+            ```swift
+            .binaryTarget(
+                name: "Cjq",
+                url: "https://github.com/Harwood/jqKit/releases/download/${{ github.ref_name }}/Cjq.xcframework.zip",
+                checksum: "${{ steps.checksums.outputs.cjq_checksum }}"),
+            .binaryTarget(
+                name: "Coniguruma",
+                url: "https://github.com/Harwood/jqKit/releases/download/${{ github.ref_name }}/Coniguruma.xcframework.zip",
+                checksum: "${{ steps.checksums.outputs.onig_checksum }}"),
+            ```
+
+            ### Checksums
+            | File | SHA-256 |
+            |---|---|
+            | `Cjq.xcframework.zip` | `${{ steps.checksums.outputs.cjq_checksum }}` |
+            | `Coniguruma.xcframework.zip` | `${{ steps.checksums.outputs.onig_checksum }}` |
+          files: |
+            Cjq.xcframework.zip
+            Coniguruma.xcframework.zip
