@@ -49,15 +49,25 @@ let package = Package(
     ),
     // libjq 1.8.x static library, packaged as XCFramework.
     // Build with: ./scripts/build-xcframeworks.sh
-    .binaryTarget(
-      name: "Cjq",
-      path: "Frameworks/Cjq.xcframework"
-    ),
+//    .binaryTarget(
+//      name: "Cjq",
+//      path: "Frameworks/Cjq.xcframework"
+//    ),
     // linoniguruma (jq's regex engine), packaged as XCFramework.
+//    .binaryTarget(
+//      name: "Coniguruma",
+//      path: "Frameworks/Coniguruma.xcframework"
+//    ),
+    // libjq 1.8.x static library, packaged as XCFramework.
     .binaryTarget(
-      name: "Coniguruma",
-      path: "Frameworks/Coniguruma.xcframework"
-    ),
+    name: "Cjq",
+    url: "https://github.com/Harwood/jqKit/releases/download/jq-1.8.1/Cjq.xcframework.zip",
+    checksum: "8166e6312e8742a3d07ea01d9cd8a9f80512d8cbad221a5deb9f9f0d1d599171"),
+    // linoniguruma (jq's regex engine), packaged as XCFramework.
+.binaryTarget(
+    name: "Coniguruma",
+    url: "https://github.com/Harwood/jqKit/releases/download/jq-1.8.1/Coniguruma.xcframework.zip",
+    checksum: "9ead7c6c74f370634759d9363fb88f579cc947ac6b715914d64633afae243fa8"),
     .testTarget(
       name: "jqKitTests",
       dependencies: ["jqKit"],
