@@ -1,3 +1,5 @@
+import Foundation
+
 /// Errors thrown by ``JQProgram`` and the ``jqRun(_:expression:)`` convenience function.
 public enum JQError: Error, LocalizedError, Sendable {
     /// The jq runtime state could not be allocated (extremely unlikely; out of memory).

@@ -219,6 +219,29 @@ build_all() {
     local headers_jq="$mac_arm_jq/include"
     local headers_onig="$mac_arm_onig/include"
 
+    log "Generating module map for Cjq"
+
+    # Cjq module map (libjq)
+    if [ ! -f "$headers_jq/jq.h" ]; then
+        log "Error: jq.h not found in $headers_jq"
+        exit 1
+    fi
+    cat > "$headers_jq/module.modulemap" << 'EOF'
+module Cjq {
+    header "jq.h"
+    export *
+}
+EOF
+
+    # Coniguruma is a link-only dependency for Cjq. Do not emit a module map
+    # here: Xcode flattens static XCFramework headers into one product include
+    # directory, so multiple Headers/module.modulemap files collide.
+    if [ ! -f "$headers_onig/oniguruma.h" ]; then
+        log "Error: oniguruma.h not found in $headers_onig"
+        exit 1
+    fi
+    rm -f "$headers_onig/module.modulemap"
+
     log "Assembling Cjq.xcframework"
     make_xcframework "$FRAMEWORKS_DIR/Cjq.xcframework" \
         "$mac_fat_dir/libjq.a"          "$headers_jq" \

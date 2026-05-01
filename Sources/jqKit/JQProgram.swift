@@ -1,5 +1,4 @@
 import Cjq
-import Coniguruma
 import Foundation
 
 // MARK: - JQProgram
@@ -40,14 +39,15 @@ public final class JQProgram: @unchecked Sendable {
         // Collect compilation error messages via a C callback.
         // We pass a typed pointer to a local [String] buffer as the context.
         var errorMessages: [String] = []
-        try withUnsafeMutablePointer(to: &errorMessages) { ptr in
+        let compiled = withUnsafeMutablePointer(to: &errorMessages) { ptr in
             jq_set_error_cb(state, JQProgram.compilationErrorCallback, ptr)
             defer { jq_set_error_cb(state, nil, nil) }
 
-            guard jq_compile(state, expression) != 0 else {
-                jq_teardown(&self.state)
-                throw JQError.compilationFailed(errorMessages.joined(separator: "\n"))
-            }
+            return jq_compile(state, expression) != 0
+        }
+        guard compiled else {
+            jq_teardown(&self.state)
+            throw JQError.compilationFailed(errorMessages.joined(separator: "\n"))
         }
 
         // Disable debug and input callbacks — not needed.
@@ -153,7 +153,7 @@ public final class JQProgram: @unchecked Sendable {
 
     /// C-compatible compilation error callback. Appends each error message to
     /// the `[String]` buffer whose pointer is passed as `ctx`.
-    private static let compilationErrorCallback: jq_err_cb = { ctx, msg in
+    private static let compilationErrorCallback: jq_msg_cb = { ctx, msg in
         guard let ctx else { return }
         if jv_get_kind(msg) == JV_KIND_STRING {
             ctx.assumingMemoryBound(to: [String].self)
